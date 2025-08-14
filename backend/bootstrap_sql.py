@@ -31,8 +31,12 @@ DDL = [
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
     """,
-    "CREATE INDEX IF NOT EXISTS idx_offers_restaurant ON foody_offers(restaurant_id);",
-    "CREATE INDEX IF NOT EXISTS idx_offers_expires ON foody_offers(expires_at);",
+    """
+    CREATE INDEX IF NOT EXISTS idx_offers_restaurant ON foody_offers(restaurant_id);
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_offers_expires ON foody_offers(expires_at);
+    """,
     """
     CREATE TABLE IF NOT EXISTS foody_redeems (
         id BIGSERIAL PRIMARY KEY,
@@ -51,7 +55,6 @@ async def run():
         for q in DDL:
             await conn.execute(q)
 
-        # demo seed
         rid = 'RID_TEST'
         key = 'KEY_TEST'
         row = await conn.fetchrow('SELECT 1 FROM foody_restaurants WHERE restaurant_id=$1', rid)

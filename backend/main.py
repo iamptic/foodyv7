@@ -6,20 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import bootstrap_sql
 
-# R2 (S3) presign
 import boto3
 from botocore.client import Config as BotoConfig
 
 DB_URL = os.getenv("DATABASE_URL")
 CORS = [s.strip() for s in (os.getenv("CORS_ORIGINS","").split(",") if os.getenv("CORS_ORIGINS") else [])]
-
 R2_ENDPOINT = os.getenv("R2_ENDPOINT")
 R2_BUCKET   = os.getenv("R2_BUCKET")
 R2_ACCESS_KEY_ID     = os.getenv("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
 
 app = FastAPI(title="Foody Backend — MVP API")
-
 if CORS:
     app.add_middleware(
         CORSMiddleware,
@@ -46,7 +43,6 @@ async def get_conn():
 async def on_startup():
     bootstrap_sql.ensure()
     await get_conn()
-    # быстрый пробный запрос, чтобы не падать на старте
     async with pool.acquire() as conn:
         try:
             await conn.fetchval("SELECT COUNT(*) FROM foody_restaurants")
@@ -57,7 +53,6 @@ async def on_startup():
 async def health():
     return {"ok": True, "db": DB_URL is not None}
 
-# -------- Merchant --------
 @app.post("/api/v1/merchant/register_public")
 async def register_public(data: Dict[str, Any] = Body(...)):
     name = (data.get("name") or "").strip() or "Foody Merchant"
@@ -103,7 +98,6 @@ async def save_profile(data: Dict[str, Any] = Body(...), x_foody_key: str = Head
         row = await conn.fetchrow("SELECT * FROM foody_restaurants WHERE restaurant_id=$1", rid)
         return dict(row)
 
-# -------- Offers --------
 @app.post("/api/v1/merchant/offers")
 async def create_offer(data: Dict[str, Any] = Body(...), x_foody_key: str = Header(None)):
     x_key = auth_key(x_foody_key)
@@ -198,7 +192,6 @@ async def delete_offer(data: Dict[str, Any] = Body(...), x_foody_key: str = Head
         await conn.execute("DELETE FROM foody_offers WHERE id=$1 AND restaurant_id=$2", offer_id, rid)
         return {"deleted": offer_id}
 
-# -------- Public offers --------
 @app.get("/api/v1/offers")
 async def public_offers():
     now = dt.datetime.utcnow()
@@ -218,7 +211,7 @@ async def export_csv(restaurant_id: str = Query(...), x_foody_key: str = Header(
         if not ok: raise HTTPException(403, "Invalid credentials")
         rows = await conn.fetch("SELECT * FROM foody_offers WHERE restaurant_id=$1 ORDER BY id DESC", restaurant_id)
     def gen():
-        buf = io.StringIO(); w = csv.writer(buf)
+        buf = io.StringIO(); import csv as _csv; w = _csv.writer(buf)
         w.writerow(["id","title","price_cents","original_price_cents","qty_total","qty_left","expires_at","status"])
         for r in rows:
             w.writerow([r["id"],r["title"],r["price_cents"],r["original_price_cents"],r["qty_total"],r["qty_left"],r["expires_at"],r["status"]])
@@ -226,7 +219,6 @@ async def export_csv(restaurant_id: str = Query(...), x_foody_key: str = Header(
     headers = {"Content-Disposition": f'attachment; filename="offers_{restaurant_id}.csv"'}
     return StreamingResponse(gen(), media_type="text/csv", headers=headers)
 
-# -------- Redeem + Stats --------
 @app.post("/api/v1/merchant/redeem")
 async def redeem(data: Dict[str, Any] = Body(...), x_foody_key: str = Header(None)):
     x_key = auth_key(x_foody_key)
@@ -284,7 +276,7 @@ async def stats(restaurant_id: str = Query(...), metric: str = Query("redeems"),
                 WHERE restaurant_id=$1 AND created_at BETWEEN $2 AND $3
                 GROUP BY d ORDER BY d
             ''', restaurant_id, start, end)
-        else:  # redeems
+        else:
             rows = await conn.fetch('''
                 SELECT date_trunc('day', redeemed_at) AS d, COUNT(*) AS v
                 FROM foody_redeems
@@ -295,7 +287,6 @@ async def stats(restaurant_id: str = Query(...), metric: str = Query("redeems"),
         points = [{"x": r["d"].isoformat(), "y": int(r["v"] or 0)} for r in rows]
         return {"points": points}
 
-# -------- Uploads: presign to R2 --------
 def s3_client():
     if not (R2_ENDPOINT and R2_BUCKET and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY):
         raise HTTPException(400, "R2 not configured")
@@ -309,14 +300,13 @@ def s3_client():
 @app.post("/api/v1/merchant/uploads/presign")
 async def presign_upload(data: Dict[str, Any] = Body(...), x_foody_key: str = Header(None)):
     x_key = auth_key(x_foody_key)
-    filename = (data.get("filename") or "file.bin").replace("\\","/").split("/")[-1]
+    filename = (data.get("filename") or "file.bin").replace("\","/").split("/")[-1]
     content_type = data.get("content_type") or "application/octet-stream"
     rid = data.get("restaurant_id") or "misc"
     if data.get("restaurant_id"):
         async with pool.acquire() as conn:
             ok = await conn.fetchrow("SELECT 1 FROM foody_restaurants WHERE restaurant_id=$1 AND api_key=$2", rid, x_key)
             if not ok: raise HTTPException(403, "Invalid credentials")
-
     key = f"restaurants/{rid}/{dt.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(4)}_{filename}"
     s3 = s3_client()
     post = s3.generate_presigned_post(
