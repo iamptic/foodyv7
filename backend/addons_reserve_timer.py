@@ -43,11 +43,8 @@ def _parse_close_dt(close_time_text: Optional[str]) -> Optional[dt.datetime]:
     except Exception:
         return None
 
-async def _fetch_restaurant(conn, restaurant_id: str):
-    return await conn.fetchrow("SELECT * FROM foody_restaurants WHERE restaurant_id=$1", restaurant_id)
-
 async def _auth_merchant(conn, restaurant_id: str, api_key: str):
-    row = await conn.fetchrow("SELECT * FROM foody_restaurants WHERE restaurant_id=$1 AND api_key=$2", restaurant_id, api_key)
+    row = await conn.fetchrow("SELECT 1 FROM foody_restaurants WHERE restaurant_id=$1 AND api_key=$2", restaurant_id, api_key)
     if not row:
         raise HTTPException(status_code=401, detail="unauthorized")
 

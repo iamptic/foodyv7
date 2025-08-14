@@ -1,3 +1,4 @@
+
 import os, asyncio, asyncpg
 
 DB_URL = os.getenv("DATABASE_URL")
@@ -14,7 +15,8 @@ async def _ensure(conn: asyncpg.Connection):
             lat           DOUBLE PRECISION,
             lng           DOUBLE PRECISION,
             close_time    TEXT,
-            created_at    TIMESTAMPTZ DEFAULT now()
+            created_at    TIMESTAMPTZ DEFAULT now(),
+            title         TEXT
         );
     """)
     # columns (idempotent)
@@ -27,21 +29,8 @@ async def _ensure(conn: asyncpg.Connection):
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS close_time TEXT;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();")
-    # optional legacy title must be nullable
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS title TEXT;")
-    await conn.execute(r"""
-    DO $$
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='foody_restaurants' AND column_name='title' AND is_nullable='NO'
-      ) THEN
-        ALTER TABLE foody_restaurants ALTER COLUMN title DROP NOT NULL;
-      END IF;
-    END $$;
-    """)
-
-    # --- ensure numeric `id` column and sequence (works even if existing id is TEXT) ---
+    # ensure id + sequence (robust)
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS id BIGINT;")
     await conn.execute(r"""
         DO $$
@@ -55,8 +44,6 @@ async def _ensure(conn: asyncpg.Connection):
         END $$;
     """)
     await conn.execute("ALTER TABLE foody_restaurants ALTER COLUMN id SET DEFAULT nextval('foody_restaurants_id_seq');")
-
-    # sync sequence safely regardless of id type
     await conn.execute(r"""
         DO $$
         DECLARE
@@ -79,12 +66,8 @@ async def _ensure(conn: asyncpg.Connection):
           PERFORM setval('foody_restaurants_id_seq', v_max);
         END $$;
     """)
-
-    # backfill null ids
     await conn.execute("UPDATE foody_restaurants SET id = nextval('foody_restaurants_id_seq') WHERE id IS NULL;")
     await conn.execute("ALTER TABLE foody_restaurants ALTER COLUMN id SET NOT NULL;")
-
-    # business key on restaurant_id
     await conn.execute(r"""
         DO $$ BEGIN
           IF NOT EXISTS (
@@ -112,7 +95,6 @@ async def _ensure(conn: asyncpg.Connection):
             created_at           TIMESTAMPTZ DEFAULT now()
         );
     """)
-    # normalize offers types/defaults
     await conn.execute(r"""
         DO $$
         DECLARE v_typ text;
@@ -163,6 +145,31 @@ async def _ensure(conn: asyncpg.Connection):
         DO $$ BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='foody_redeems_restaurant_idx') THEN
             CREATE INDEX foody_redeems_restaurant_idx ON public.foody_redeems(restaurant_id);
+          END IF;
+        END $$;
+    """)
+
+    # --- foody_reservations ---
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS foody_reservations (
+            id            BIGSERIAL PRIMARY KEY,
+            restaurant_id TEXT NOT NULL,
+            offer_id      BIGINT NOT NULL,
+            qty           INTEGER NOT NULL DEFAULT 1,
+            code          TEXT NOT NULL UNIQUE,
+            price_cents   INTEGER NOT NULL DEFAULT 0,
+            status        TEXT NOT NULL DEFAULT 'active',
+            created_at    TIMESTAMPTZ DEFAULT now(),
+            expires_at    TIMESTAMPTZ
+        );
+    """)
+    await conn.execute("""
+        DO $$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='foody_reservations_restaurant_idx') THEN
+            CREATE INDEX foody_reservations_restaurant_idx ON public.foody_reservations(restaurant_id);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='foody_reservations_offer_idx') THEN
+            CREATE INDEX foody_reservations_offer_idx ON public.foody_reservations(offer_id);
           END IF;
         END $$;
     """)
