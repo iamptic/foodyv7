@@ -1,0 +1,25 @@
+
+# --- foody_reservations ---
+await conn.execute("""
+    CREATE TABLE IF NOT EXISTS foody_reservations (
+        id            BIGSERIAL PRIMARY KEY,
+        restaurant_id TEXT NOT NULL,
+        offer_id      BIGINT NOT NULL,
+        qty           INTEGER NOT NULL DEFAULT 1,
+        code          TEXT NOT NULL UNIQUE,
+        price_cents   INTEGER NOT NULL DEFAULT 0,
+        status        TEXT NOT NULL DEFAULT 'active',
+        created_at    TIMESTAMPTZ DEFAULT now(),
+        expires_at    TIMESTAMPTZ
+    );
+""")
+await conn.execute("""
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='foody_reservations_restaurant_idx') THEN
+        CREATE INDEX foody_reservations_restaurant_idx ON public.foody_reservations(restaurant_id);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='foody_reservations_offer_idx') THEN
+        CREATE INDEX foody_reservations_offer_idx ON public.foody_reservations(offer_id);
+      END IF;
+    END $$;
+""")
