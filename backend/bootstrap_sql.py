@@ -27,10 +27,10 @@ async def _ensure(conn: asyncpg.Connection):
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS close_time TEXT;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();")
-    # --- ensure numeric `id` column auto-increments (for legacy schemas) ---
+
+    # --- ensure numeric `id` column and sequence (works even if existing id is TEXT) ---
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS id BIGINT;")
-    # create sequence if not exists
-    await conn.execute("""
+    await conn.execute(r"""
         DO $$
         BEGIN
           IF NOT EXISTS (
@@ -41,16 +41,39 @@ async def _ensure(conn: asyncpg.Connection):
           END IF;
         END $$;
     """)
-    # attach default to id
     await conn.execute("ALTER TABLE foody_restaurants ALTER COLUMN id SET DEFAULT nextval('foody_restaurants_id_seq');")
-    # sync sequence to max(id)
-    await conn.execute("SELECT setval('foody_restaurants_id_seq', COALESCE((SELECT MAX(id) FROM foody_restaurants), 0));")
+
+    # sync sequence safely regardless of id type
+    await conn.execute(r"""
+        DO $$
+        DECLARE
+          v_typ text;
+          v_max bigint;
+        BEGIN
+          SELECT data_type INTO v_typ
+          FROM information_schema.columns
+          WHERE table_name='foody_restaurants' AND column_name='id' AND table_schema='public';
+
+          IF v_typ IN ('integer','bigint','smallint') THEN
+            EXECUTE 'SELECT COALESCE(MAX(id),0) FROM public.foody_restaurants' INTO v_max;
+          ELSE
+            -- text or other: consider only numeric-looking ids
+            EXECUTE $$
+              SELECT COALESCE(MAX(CASE WHEN id ~ '^\d+$' THEN id::bigint ELSE NULL END),0)
+              FROM public.foody_restaurants
+            $$ INTO v_max;
+          END IF;
+
+          PERFORM setval('foody_restaurants_id_seq', v_max);
+        END $$;
+    """)
+
     # backfill null ids
     await conn.execute("UPDATE foody_restaurants SET id = nextval('foody_restaurants_id_seq') WHERE id IS NULL;")
-    # keep id NOT NULL (even if PK is on restaurant_id)
     await conn.execute("ALTER TABLE foody_restaurants ALTER COLUMN id SET NOT NULL;")
-    # unique on restaurant_id (acts like business key)
-    await conn.execute("""
+
+    # business key on restaurant_id
+    await conn.execute(r"""
         DO $$ BEGIN
           IF NOT EXISTS (
             SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'foody_restaurants_rid_uidx'
@@ -88,7 +111,7 @@ async def _ensure(conn: asyncpg.Connection):
     await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS description TEXT;")
     await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';")
     await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();")
-    await conn.execute("""
+    await conn.execute(r"""
         DO $$ BEGIN
           IF NOT EXISTS (
             SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'foody_offers_restaurant_idx'
@@ -114,7 +137,7 @@ async def _ensure(conn: asyncpg.Connection):
     await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS code TEXT;")
     await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS amount_cents INTEGER DEFAULT 0;")
     await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS redeemed_at TIMESTAMPTZ DEFAULT now();")
-    await conn.execute("""
+    await conn.execute(r"""
         DO $$ BEGIN
           IF NOT EXISTS (
             SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'foody_redeems_restaurant_idx'
@@ -132,7 +155,7 @@ async def run():
         await conn.close()
 
 def ensure():
-    if os.getenv("RUN_MIGRATIONS", "0").lower() not in ("1", "true", "yes", "on"):
+    if os.getenv("RUN_MIGRATIONS", "0").lower() not in ("1","true","yes","on"):
         print("BOOTSTRAP: RUN_MIGRATIONS disabled")
         return
     try:
