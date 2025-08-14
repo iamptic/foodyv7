@@ -112,6 +112,11 @@ input:focus, textarea:focus { border-color: var(--brand-2); box-shadow: 0 0 0 2p
 .stat-val { font-size: 28px; font-weight: 800; }
 .stat-label { color: var(--subtext); }
 
+.dropzone{border:1px dashed var(--border); border-radius:16px; padding:14px; text-align:center; background:var(--card)}
+.dropzone.drag{outline:2px solid var(--brand); outline-offset:4px}
+#preview{max-width:100%; max-height:220px; margin-top:8px; border-radius:12px; border:1px solid var(--border)}
+.dz-actions{margin-top:8px; display:flex; gap:8px; justify-content:center}
+
 /* Lists & table */
 .list { display: grid; gap: 10px; }
 .list-cards .item {
