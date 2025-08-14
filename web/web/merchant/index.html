@@ -134,6 +134,15 @@
           </form>
         </div>
       </section>
+<!-- Dropzone для фото -->
+<div id="dropzone" class="dropzone">
+  <input type="file" id="fileInput" accept="image/*" hidden />
+  <div id="dzPrompt">Перетащи фото сюда или нажми, чтобы выбрать</div>
+  <img id="preview" alt="" style="display:none;" />
+  <div class="dz-actions">
+    <button id="uploadBtn" class="btn">Загрузить</button>
+  </div>
+</div>
 
       <!-- PROFILE -->
       <section class="pane" id="profile">
