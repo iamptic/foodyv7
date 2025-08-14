@@ -1,44 +1,33 @@
 import os
-import logging
+import asyncio
 from fastapi import FastAPI, Request
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import Update, WebAppInfo
+from aiogram.types import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "webhook")
-
-# Публичная витрина (MiniApp для покупателей)
 WEBAPP_PUBLIC = os.getenv("WEBAPP_PUBLIC", "https://foodyweb-production.up.railway.app")
-# ЛК ресторана (MiniApp для ресторанов)
-MERCHANT_URL = os.getenv("MERCHANT_URL", f"{WEBAPP_PUBLIC.rstrip('/')}/web/merchant/")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
-def main_menu_kb() -> types.InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🛍 Витрина (MiniApp)", web_app=WebAppInfo(url=WEBAPP_PUBLIC))
-    kb.button(text="🏪 Ресторан (ЛК)", web_app=WebAppInfo(url=MERCHANT_URL))
-    kb.adjust(1)
-    return kb.as_markup()
-
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
-    text = (
-        "Привет! Это Foody 👋\n\n"
-        "• Покупатели — открывайте витрину (MiniApp).\n"
-        "• Рестораны — вход в личный кабинет по кнопке ниже."
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🛍 Витрина", url=f"{WEBAPP_PUBLIC}/web/buyer/"),
+        InlineKeyboardButton(text="🏪 Ресторан (ЛК)", url=f"{WEBAPP_PUBLIC}/web/merchant/")
+    ],[
+        InlineKeyboardButton(text="📋 Регистрация ресторана", url=f"{WEBAPP_PUBLIC}/web/merchant/register/")
+    ]])
+    await message.answer(
+        "Привет! Это Foody.\n\n"
+        "• Витрина — посмотреть предложения рядом.\n"
+        "• Личный кабинет — управлять офферами.\n"
+        "• Регистрация — создать ресторан и получить ключи.",
+        reply_markup=kb
     )
-    await message.answer(text, reply_markup=main_menu_kb())
-
-@dp.message(Command("merchant"))
-async def merchant_handler(message: types.Message):
-    await message.answer("Личный кабинет ресторана:", reply_markup=main_menu_kb())
 
 @app.post(f"/{WEBHOOK_SECRET}")
 async def telegram_webhook(request: Request):
@@ -49,7 +38,7 @@ async def telegram_webhook(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "webapp_public": WEBAPP_PUBLIC, "merchant_url": MERCHANT_URL}
+    return {"ok": True}
 
 if __name__ == "__main__":
     import uvicorn
