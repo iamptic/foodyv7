@@ -27,6 +27,19 @@ async def _ensure(conn: asyncpg.Connection):
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS close_time TEXT;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();")
+    # optional legacy title must be nullable
+    await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS title TEXT;")
+    await conn.execute(r"""
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='foody_restaurants' AND column_name='title' AND is_nullable='NO'
+      ) THEN
+        ALTER TABLE foody_restaurants ALTER COLUMN title DROP NOT NULL;
+      END IF;
+    END $$;
+    """)
 
     # --- ensure numeric `id` column and sequence (works even if existing id is TEXT) ---
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS id BIGINT;")
@@ -57,7 +70,6 @@ async def _ensure(conn: asyncpg.Connection):
           IF v_typ IN ('integer','bigint','smallint') THEN
             EXECUTE 'SELECT COALESCE(MAX(id),0) FROM public.foody_restaurants' INTO v_max;
           ELSE
-            -- text or other: consider only numeric-looking ids
             EXECUTE $$
               SELECT COALESCE(MAX(CASE WHEN id ~ '^\d+$' THEN id::bigint ELSE NULL END),0)
               FROM public.foody_restaurants
@@ -86,7 +98,7 @@ async def _ensure(conn: asyncpg.Connection):
     # --- foody_offers ---
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS foody_offers (
-            id                   SERIAL PRIMARY KEY,
+            id                   BIGSERIAL PRIMARY KEY,
             restaurant_id        TEXT NOT NULL,
             title                TEXT,
             price_cents          INTEGER NOT NULL DEFAULT 0,
@@ -100,23 +112,27 @@ async def _ensure(conn: asyncpg.Connection):
             created_at           TIMESTAMPTZ DEFAULT now()
         );
     """)
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS restaurant_id TEXT;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS title TEXT;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS price_cents INTEGER DEFAULT 0;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS original_price_cents INTEGER;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS qty_total INTEGER DEFAULT 0;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS qty_left INTEGER DEFAULT 0;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS image_url TEXT;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS description TEXT;")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';")
-    await conn.execute("ALTER TABLE foody_offers ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();")
+    # normalize offers types/defaults
+    await conn.execute(r"""
+        DO $$
+        DECLARE v_typ text;
+        BEGIN
+          SELECT data_type INTO v_typ FROM information_schema.columns
+          WHERE table_schema='public' AND table_name='foody_offers' AND column_name='restaurant_id';
+          IF v_typ IS NOT NULL AND v_typ <> 'text' THEN
+            EXECUTE 'ALTER TABLE public.foody_offers ALTER COLUMN restaurant_id TYPE TEXT USING restaurant_id::text';
+          END IF;
+        END $$;
+    """)
+    await conn.execute("ALTER TABLE foody_offers ALTER COLUMN price_cents SET DEFAULT 0;")
+    await conn.execute("ALTER TABLE foody_offers ALTER COLUMN qty_total SET DEFAULT 0;")
+    await conn.execute("ALTER TABLE foody_offers ALTER COLUMN qty_left SET DEFAULT 0;")
+    await conn.execute("ALTER TABLE foody_offers ALTER COLUMN status SET DEFAULT 'active';")
+    await conn.execute("ALTER TABLE foody_offers ALTER COLUMN created_at SET DEFAULT now();")
     await conn.execute(r"""
         DO $$ BEGIN
-          IF NOT EXISTS (
-            SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'foody_offers_restaurant_idx'
-          ) THEN
-            CREATE INDEX foody_offers_restaurant_idx ON foody_offers(restaurant_id);
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='foody_offers_restaurant_idx') THEN
+            CREATE INDEX foody_offers_restaurant_idx ON public.foody_offers(restaurant_id);
           END IF;
         END $$;
     """)
@@ -124,7 +140,7 @@ async def _ensure(conn: asyncpg.Connection):
     # --- foody_redeems ---
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS foody_redeems (
-            id            SERIAL PRIMARY KEY,
+            id            BIGSERIAL PRIMARY KEY,
             restaurant_id TEXT NOT NULL,
             offer_id      INTEGER,
             code          TEXT NOT NULL UNIQUE,
@@ -132,17 +148,21 @@ async def _ensure(conn: asyncpg.Connection):
             redeemed_at   TIMESTAMPTZ DEFAULT now()
         );
     """)
-    await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS restaurant_id TEXT;")
-    await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS offer_id INTEGER;")
-    await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS code TEXT;")
-    await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS amount_cents INTEGER DEFAULT 0;")
-    await conn.execute("ALTER TABLE foody_redeems ADD COLUMN IF NOT EXISTS redeemed_at TIMESTAMPTZ DEFAULT now();")
+    await conn.execute(r"""
+        DO $$
+        DECLARE v_typ2 text;
+        BEGIN
+          SELECT data_type INTO v_typ2 FROM information_schema.columns
+          WHERE table_schema='public' AND table_name='foody_redeems' AND column_name='restaurant_id';
+          IF v_typ2 IS NOT NULL AND v_typ2 <> 'text' THEN
+            EXECUTE 'ALTER TABLE public.foody_redeems ALTER COLUMN restaurant_id TYPE TEXT USING restaurant_id::text';
+          END IF;
+        END $$;
+    """)
     await conn.execute(r"""
         DO $$ BEGIN
-          IF NOT EXISTS (
-            SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'foody_redeems_restaurant_idx'
-          ) THEN
-            CREATE INDEX foody_redeems_restaurant_idx ON foody_redeems(restaurant_id);
+          IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='foody_redeems_restaurant_idx') THEN
+            CREATE INDEX foody_redeems_restaurant_idx ON public.foody_redeems(restaurant_id);
           END IF;
         END $$;
     """)

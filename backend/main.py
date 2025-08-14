@@ -41,7 +41,8 @@ async def get_conn():
 
 @app.on_event("startup")
 async def on_startup():
-    bootstrap_sql.ensure()
+    # wait for migrations
+    await bootstrap_sql.run()
     await get_conn()
     async with pool.acquire() as conn:
         try:
