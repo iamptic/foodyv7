@@ -2,30 +2,43 @@ import os
 import logging
 from fastapi import FastAPI, Request
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import Update
+from aiogram.types import Update, WebAppInfo
 from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "webhook")
-WEBAPP_PUBLIC = os.getenv("WEBAPP_PUBLIC", "")
-BOT_WEBHOOK_URL = os.getenv("BOT_WEBHOOK_URL")  # e.g. https://foodybot-production.up.railway.app
 
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN env is required")
+# Публичная витрина (MiniApp для покупателей)
+WEBAPP_PUBLIC = os.getenv("WEBAPP_PUBLIC", "https://foodyweb-production.up.railway.app")
+# ЛК ресторана (MiniApp для ресторанов)
+MERCHANT_URL = os.getenv("MERCHANT_URL", f"{WEBAPP_PUBLIC.rstrip('/')}/web/merchant/")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
+def main_menu_kb() -> types.InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🛍 Витрина (MiniApp)", web_app=WebAppInfo(url=WEBAPP_PUBLIC))
+    kb.button(text="🏪 Ресторан (ЛК)", web_app=WebAppInfo(url=MERCHANT_URL))
+    kb.adjust(1)
+    return kb.as_markup()
+
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
-    await message.answer(
-        "Привет! 🎉 Это Foody бот.\n\n"
-        "Смотри акции и заказывай еду со скидками 🍔🥗\n\n"
-        f"Витрина: {WEBAPP_PUBLIC or 'не задана (WEBAPP_PUBLIC)'}"
+    text = (
+        "Привет! Это Foody 👋\n\n"
+        "• Покупатели — открывайте витрину (MiniApp).\n"
+        "• Рестораны — вход в личный кабинет по кнопке ниже."
     )
+    await message.answer(text, reply_markup=main_menu_kb())
+
+@dp.message(Command("merchant"))
+async def merchant_handler(message: types.Message):
+    await message.answer("Личный кабинет ресторана:", reply_markup=main_menu_kb())
 
 @app.post(f"/{WEBHOOK_SECRET}")
 async def telegram_webhook(request: Request):
@@ -36,17 +49,7 @@ async def telegram_webhook(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"ok": True}
-
-@app.on_event("startup")
-async def on_startup():
-    # Опционально: автоматически установить webhook, если задан BOT_WEBHOOK_URL
-    if BOT_WEBHOOK_URL:
-        try:
-            ok = await bot.set_webhook(url=f"{BOT_WEBHOOK_URL}/{WEBHOOK_SECRET}")
-            logging.info("Webhook set to %s -> %s", BOT_WEBHOOK_URL, ok)
-        except Exception as e:
-            logging.exception("Failed to set webhook: %s", e)
+    return {"ok": True, "webapp_public": WEBAPP_PUBLIC, "merchant_url": MERCHANT_URL}
 
 if __name__ == "__main__":
     import uvicorn
