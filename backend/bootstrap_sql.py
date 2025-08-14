@@ -1,4 +1,3 @@
-
 import os, asyncio, asyncpg
 
 DB_URL = os.getenv("DATABASE_URL")
@@ -7,8 +6,8 @@ async def _ensure(conn: asyncpg.Connection):
     # --- foody_restaurants ---
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS foody_restaurants (
-            restaurant_id TEXT PRIMARY KEY,
-            api_key       TEXT NOT NULL,
+            restaurant_id TEXT,
+            api_key       TEXT,
             name          TEXT,
             phone         TEXT,
             address       TEXT,
@@ -18,7 +17,7 @@ async def _ensure(conn: asyncpg.Connection):
             created_at    TIMESTAMPTZ DEFAULT now()
         );
     """)
-    # Columns (idempotent)
+    # columns (idempotent)
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS restaurant_id TEXT;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS api_key TEXT;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS name TEXT;")
@@ -28,11 +27,29 @@ async def _ensure(conn: asyncpg.Connection):
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS close_time TEXT;")
     await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();")
-    # Backfill restaurant_id where NULL, then add unique index
+    # --- ensure numeric `id` column auto-increments (for legacy schemas) ---
+    await conn.execute("ALTER TABLE foody_restaurants ADD COLUMN IF NOT EXISTS id BIGINT;")
+    # create sequence if not exists
     await conn.execute("""
-        UPDATE foody_restaurants SET restaurant_id = 'RID_'||upper(substr(md5(random()::text),1,12))
-        WHERE restaurant_id IS NULL;
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_class WHERE relkind='S' AND relname='foody_restaurants_id_seq'
+          ) THEN
+            CREATE SEQUENCE foody_restaurants_id_seq;
+            ALTER SEQUENCE foody_restaurants_id_seq OWNED BY foody_restaurants.id;
+          END IF;
+        END $$;
     """)
+    # attach default to id
+    await conn.execute("ALTER TABLE foody_restaurants ALTER COLUMN id SET DEFAULT nextval('foody_restaurants_id_seq');")
+    # sync sequence to max(id)
+    await conn.execute("SELECT setval('foody_restaurants_id_seq', COALESCE((SELECT MAX(id) FROM foody_restaurants), 0));")
+    # backfill null ids
+    await conn.execute("UPDATE foody_restaurants SET id = nextval('foody_restaurants_id_seq') WHERE id IS NULL;")
+    # keep id NOT NULL (even if PK is on restaurant_id)
+    await conn.execute("ALTER TABLE foody_restaurants ALTER COLUMN id SET NOT NULL;")
+    # unique on restaurant_id (acts like business key)
     await conn.execute("""
         DO $$ BEGIN
           IF NOT EXISTS (
