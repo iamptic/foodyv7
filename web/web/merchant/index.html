@@ -1,123 +1,136 @@
-<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Foody — ЛК</title><script src="/config.js"></script>
-<style>
- body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#0b0c10;color:#eee}
- header{padding:12px 16px;background:#111;border-bottom:1px solid #222;display:flex;gap:10px;align-items:center}
- .wrap{max-width:980px;margin:0 auto;padding:16px}
- .row{display:flex;gap:12px;flex-wrap:wrap}
- .card{flex:1;min-width:280px;background:#14161a;border:1px solid #1f232a;border-radius:14px;padding:14px}
- input,button{font:inherit;border-radius:10px;border:1px solid #2a2f38;background:#0f1115;color:#eee;padding:8px 10px}
- button{cursor:pointer}
- .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
- .title{font-weight:600;margin:0 0 6px}
- .photo{width:100%;height:140px;background:#0f1115;border:1px solid #2a2f38;border-radius:10px;object-fit:cover;margin-bottom:8px}
- .strike{opacity:.6;text-decoration:line-through;margin-left:8px;font-size:14px}
-</style>
-<header>
-  <div><b>Foody</b> — ЛК партнёра</div>
-  <div style="margin-left:auto"><a href="/web/buyer/" style="color:#9ecbff">← Витрина</a></div>
-</header>
-<div class="wrap">
-  <div class="row">
-    <div class="card" style="max-width:330px">
-      <div style="font-weight:600;margin-bottom:8px">Вход</div>
-      <div id="loginBox">
-        <input id="rid" placeholder="RID_..." /><br><br>
-        <input id="key" placeholder="KEY_..." /><br><br>
-        <button id="saveBtn">Сохранить</button>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foody — Личный кабинет ресторана</title>
+  <link rel="stylesheet" href="./merchant.css" />
+  <script defer src="/config.js"></script>
+  <script defer src="./merchant.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🍽️</span>
+      <span class="title">Foody · ЛК ресторана</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="auth" class="tab active">Вход</button>
+      <button data-tab="dashboard" class="tab">Дашборд</button>
+      <button data-tab="offers" class="tab">Офферы</button>
+      <button data-tab="profile" class="tab">Профиль</button>
+      <button data-tab="export" class="tab">Экспорт</button>
+      <button id="logoutBtn" class="tab danger">Выйти</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- AUTH -->
+    <section id="auth" class="tabpane active">
+      <div class="card">
+        <h2>Быстрый старт</h2>
+        <p class="muted">Выберите: создать новый ресторан или войти по ID и ключу.</p>
+        <div class="grid two">
+          <div>
+            <h3>Создать ресторан</h3>
+            <form id="registerForm">
+              <label>Название <input required name="name" placeholder="Кафе Плюс"/></label>
+              <label>Телефон <input required name="phone" placeholder="+7 900 123-45-67"/></label>
+              <button type="submit" class="primary">Создать</button>
+            </form>
+          </div>
+          <div>
+            <h3>Войти по данным</h3>
+            <form id="loginForm">
+              <label>Restaurant ID <input required name="restaurant_id" placeholder="RID_..."/></label>
+              <label>API Key <input required name="api_key" placeholder="KEY_..."/></label>
+              <button type="submit" class="primary">Войти</button>
+            </form>
+          </div>
+        </div>
+        <div class="note">
+          После регистрации вы получите <b>Restaurant ID</b> и <b>API Key</b>. Эти данные сохраняются в браузере.
+        </div>
       </div>
-      <div id="whoami" style="display:none"></div>
-    </div>
-    <div class="card" style="flex:2">
-      <div style="font-weight:600;margin-bottom:8px">Профиль</div>
-      <div class="row" style="gap:8px">
-        <input id="p_title" placeholder="Название *" style="min-width:220px">
-        <input id="p_phone" placeholder="Телефон">
-        <input id="p_city" placeholder="Город">
-        <input id="p_addr" placeholder="Адрес">
-        <input id="p_lat" placeholder="lat">
-        <input id="p_lon" placeholder="lon">
-        <button id="p_save">Сохранить</button>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="tabpane">
+      <div class="grid three">
+        <div class="card stat">
+          <div class="stat-title">Активные офферы</div>
+          <div class="stat-value" id="statOffers">—</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-title">Остаток шт.</div>
+          <div class="stat-value" id="statQty">—</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-title">Средняя скидка</div>
+          <div class="stat-value" id="statDisc">—</div>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="card" style="margin-top:14px">
-    <div style="font-weight:600;margin-bottom:8px">Создать оффер</div>
-    <div class="row" style="gap:8px">
-      <input id="o_title" placeholder="Название *">
-      <input id="o_price_rub" placeholder="Цена ₽ *">
-      <input id="o_orig_rub" placeholder="Старая цена ₽">
-      <input id="o_qty" placeholder="Кол-во *">
-      <input id="o_exp" placeholder="ISO время истечения (UTC)">
-      <input id="o_photo" placeholder="Фото URL (опц.)">
-      <button id="o_btn">Создать</button>
-    </div>
-  </div>
-  <div class="card" style="margin-top:14px">
-    <div style="font-weight:600;margin-bottom:8px">Мои офферы</div>
-    <div id="offers" class="grid"></div>
-  </div>
-</div>
-<script>
-const API=(window.foodyApi||'').replace(/\/$/,'');
-const st={ get rid(){return localStorage.getItem('RID')||''}, set rid(v){localStorage.setItem('RID',v)},
-           get key(){return localStorage.getItem('KEY')||''}, set key(v){localStorage.setItem('KEY',v)} };
-function $(id){return document.getElementById(id)}
-function money(c){return (c/100).toLocaleString('ru-RU',{style:'currency',currency:'RUB'})}
-function auth(){return {'X-Foody-Key': st.key}}
-async function loadProfile(){
-  if(!st.rid||!st.key){$('loginBox').style.display='block';$('whoami').style.display='none';return;}
-  const r=await fetch(API+'/api/v1/merchant/profile?restaurant_id='+encodeURIComponent(st.rid),{headers:auth()});
-  if(!r.ok){$('loginBox').style.display='block';$('whoami').style.display='none';return;}
-  const p=await r.json();
-  $('loginBox').style.display='none';$('whoami').style.display='block';
-  $('whoami').innerHTML='<div><b>RID:</b> '+st.rid+'<br><b>KEY:</b> '+st.key+'<br><b>Название:</b> '+(p.title||'')+'</div>';
-  $('p_title').value=p.title||''; $('p_phone').value=p.phone||''; $('p_city').value=p.city||''; $('p_addr').value=p.address||'';
-  $('p_lat').value=p.lat??''; $('p_lon').value=p.lon??'';
-  loadOffers();
-}
-$('saveBtn').onclick=()=>{st.rid=$('rid').value.trim();st.key=$('key').value.trim();loadProfile();};
-$('p_save').onclick=async ()=>{
-  const body={restaurant_id:st.rid,title:$('p_title').value.trim(),phone:$('p_phone').value.trim(),
-              city:$('p_city').value.trim(),address:$('p_addr').value.trim(),lat:$('p_lat').value,lon:$('p_lon').value};
-  await fetch(API+'/api/v1/merchant/profile',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
-  loadProfile();
-};
-$('o_btn').onclick=async ()=>{
-  const body={restaurant_id:st.rid,title:$('o_title').value.trim(),price:parseFloat($('o_price_rub').value||'0'),
-              original_price:parseFloat($('o_orig_rub').value||'0')||null,qty_total:parseInt($('o_qty').value||'0',10),
-              qty_left:parseInt($('o_qty').value||'0',10),expires_at:$('o_exp').value.trim()||null,photo_url:$('o_photo').value.trim()||null};
-  await fetch(API+'/api/v1/merchant/offers',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
-  loadOffers();
-};
-async function loadOffers(){
-  const r=await fetch(API+'/api/v1/merchant/offers?restaurant_id='+encodeURIComponent(st.rid)+'&status=active',{headers:auth()});
-  const arr=await r.json(); const el=$('offers'); el.innerHTML='';
-  for(const it of arr){
-    const d=document.createElement('div'); d.className='card';
-    const img = it.photo_url ? '<img class="photo" src="'+it.photo_url+'">' : '';
-    d.innerHTML = img + '<div class="title">'+(it.title||'')+'</div>' +
-      '<div>'+money(it.price_cents)+(it.original_price_cents?'<span class="strike">'+money(it.original_price_cents)+'</span>':'')+'</div>'+
-      '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
-      '<button data-id="'+it.id+'" class="edit">Редактировать</button>'+
-      '<button data-id="'+it.id+'" class="del">Удалить</button>'+
-      '<button data-id="'+it.id+'" class="clrphoto">Убрать фото</button>'+
-      '</div>';
-    d.querySelector('.del').onclick=async(ev)=>{const id=ev.target.getAttribute('data-id');await fetch(API+'/api/v1/merchant/offers/'+id+'?restaurant_id='+encodeURIComponent(st.rid),{method:'DELETE',headers:auth()});loadOffers();};
-    d.querySelector('.clrphoto').onclick=async(ev)=>{const id=ev.target.getAttribute('data-id');await fetch(API+'/api/v1/merchant/offers/'+id,{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({restaurant_id:st.rid,photo_url:null})});loadOffers();};
-    d.querySelector('.edit').onclick=async(ev)=>{
-      const id=ev.target.getAttribute('data-id');
-      const title=prompt('Название', it.title||'')||it.title;
-      const price=parseFloat(prompt('Цена ₽', (it.price_cents/100).toString())|| (it.price_cents/100));
-      const orig=prompt('Старая цена ₽ (пусто если нет)', it.original_price_cents? (it.original_price_cents/100).toString() : '')||'';
-      const expires=prompt('ISO время истечения (UTC)', it.expires_at||'')||it.expires_at;
-      const photo=prompt('Фото URL (пусто чтобы оставить как есть)', it.photo_url||'')||it.photo_url;
-      const body={restaurant_id:st.rid,title,price,original_price:(orig?parseFloat(orig):null),expires_at:expires,photo_url:photo};
-      await fetch(API+'/api/v1/merchant/offers/'+id,{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
-      loadOffers();
-    };
-    el.appendChild(d);
-  }
-}
-window.addEventListener('load',()=>{$('rid').value=st.rid;$('key').value=st.key;loadProfile();});
-</script>
+      <div class="card">
+        <h3>Ближайшие офферы</h3>
+        <div id="dashboardOffers" class="list"></div>
+      </div>
+    </section>
+
+    <!-- OFFERS -->
+    <section id="offers" class="tabpane">
+      <div class="card">
+        <h2>Создать оффер</h2>
+        <form id="offerForm" class="grid three">
+          <label>Название <input required name="title" placeholder="Сет эклеров"/></label>
+          <label>Цена, ₽ <input required name="price" type="number" min="0" step="1" placeholder="199"/></label>
+          <label>Старая цена, ₽ <input name="original_price" type="number" min="0" step="1" placeholder="349"/></label>
+          <label>Количество, шт <input required name="qty_total" type="number" min="1" step="1" placeholder="5"/></label>
+          <label>Истекает <input required name="expires_at" type="datetime-local"/></label>
+          <label>Фото (URL) <input name="image_url" placeholder="https://..."/></label>
+          <label class="full"><textarea name="description" rows="3" placeholder="Описание набора..."></textarea></label>
+          <button type="submit" class="primary full">Сохранить оффер</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Мои офферы</h3>
+        <div id="offerList" class="table"></div>
+      </div>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="profile" class="tabpane">
+      <div class="card">
+        <h2>Профиль ресторана</h2>
+        <form id="profileForm" class="grid three">
+          <label>Название <input name="name" /></label>
+          <label>Телефон <input name="phone" /></label>
+          <label>Время закрытия <input name="close_time" type="time" /></label>
+          <label class="full">Адрес <input name="address" placeholder="Город, улица, дом"/></label>
+          <label>Широта <input name="lat" type="number" step="0.000001" /></label>
+          <label>Долгота <input name="lng" type="number" step="0.000001" /></label>
+          <button type="submit" class="primary full">Сохранить профиль</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Текущие данные</h3>
+        <pre id="profileDump" class="dump">—</pre>
+      </div>
+    </section>
+
+    <!-- EXPORT -->
+    <section id="export" class="tabpane">
+      <div class="card">
+        <h2>Экспорт</h2>
+        <p class="muted">Скачать CSV с текущими офферами.</p>
+        <button id="downloadCsv" class="primary">Скачать CSV</button>
+      </div>
+      <div class="card">
+        <h3>Текущие ключи</h3>
+        <div id="creds" class="dump small">—</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+</body>
+</html>
