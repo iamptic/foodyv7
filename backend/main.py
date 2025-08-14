@@ -300,7 +300,10 @@ def s3_client():
 @app.post("/api/v1/merchant/uploads/presign")
 async def presign_upload(data: Dict[str, Any] = Body(...), x_foody_key: str = Header(None)):
     x_key = auth_key(x_foody_key)
-    filename = (data.get("filename") or "file.bin").replace("\","/").split("/")[-1]
+    # --- HOTFIX: safe filename parsing (escaped backslash) ---
+    name_raw = (data.get("filename") or "file.bin")
+    # Windows-style paths may include backslashes; keep only the last segment
+    filename = name_raw.replace("\\","/").split("/")[-1]
     content_type = data.get("content_type") or "application/octet-stream"
     rid = data.get("restaurant_id") or "misc"
     if data.get("restaurant_id"):
