@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Foody · Регистрация ресторана</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script defer src="/config.js"></script>
+  <script defer src="./reg.js"></script>
+</head>
+<body>
+  <div class="tg-shell">
+    <header class="tg-appbar">
+      <div class="tg-appbar__left">
+        <div class="avatar">F</div>
+        <div class="meta">
+          <div class="title">Регистрация ресторана</div>
+          <div class="subtitle">Создайте ЛК за 30 секунд</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="tg-content">
+      <section class="tg-card">
+        <div class="tg-card__b">
+          <form id="regForm" class="form">
+            <label class="field"><span>Название ресторана</span><input name="name" placeholder="Например, Demo Cafe" required /></label>
+            <label class="field"><span>Телефон (опционально)</span><input name="phone" placeholder="+7 999 000-00-00" /></label>
+            <div class="actions end"><button class="btn primary" id="regBtn">Зарегистрировать</button></div>
+          </form>
+
+          <div id="result" class="result hidden">
+            <h3>Готово!</h3>
+            <p>Сохраните эти данные. Они нужны для доступа к ЛК и API:</p>
+            <div class="kv"><span>Restaurant ID:</span> <code id="rid">—</code></div>
+            <div class="kv"><span>API Key:</span> <code id="key">—</code></div>
+            <div class="actions">
+              <button id="copyBtn" class="btn">Скопировать</button>
+              <button id="openBtn" class="btn primary">Открыть ЛК</button>
+            </div>
+            <p class="sub">Кнопка «Открыть ЛК» сохранит ключи в браузере.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast"></div>
+</body>
+</html>

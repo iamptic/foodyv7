@@ -3,57 +3,35 @@
   const tg = window.Telegram?.WebApp; if (tg){ tg.expand(); const apply=()=>{const s=tg.colorScheme||'dark';document.documentElement.dataset.theme=s;}; apply(); tg.onEvent?.('themeChanged',apply); }
   const cfg = window.__FOODY__ || {}; const FOODY_API = cfg.FOODY_API || "https://foodyback-production.up.railway.app";
 
-  // --- auth state (query param OR localStorage OR demo) ---
   const url = new URL(location.href);
   const state = {
     restaurant_id: url.searchParams.get('rid') || localStorage.getItem('rid') || 'RID_TEST',
-    api_key:       url.searchParams.get('key') || localStorage.getItem('key') || 'KEY_TEST',
-    lang: localStorage.getItem('foody_lang') || (tg?.initDataUnsafe?.user?.language_code||'ru').slice(0,2)
+    api_key:       url.searchParams.get('key') || localStorage.getItem('key') || 'KEY_TEST'
   };
   localStorage.setItem('rid', state.restaurant_id);
   localStorage.setItem('key', state.api_key);
 
-  const dict={ ru:{
-      dashboard:'Дашборд', create:'+ Создать', edit:'Ред.', archive:'В архив', activate:'Активировать', del:'Удалить',
-      saved:'Сохранено ✅', removed:'Удалено', failed:'Ошибка', uploaded:'Фото загружено', uploading:'Загружаем...',
-      search:'Поиск'
-    },
-    en:{
-      dashboard:'Dashboard', create:'+ Create', edit:'Edit', archive:'Archive', activate:'Activate', del:'Delete',
-      saved:'Saved ✅', removed:'Deleted', failed:'Error', uploaded:'Image uploaded', uploading:'Uploading...',
-      search:'Search'
-    }
-  };
-  const t=k=>(dict[state.lang]&&dict[state.lang][k])||dict.ru[k]||k;
-
-  $('#langBtn').addEventListener('click',()=>{ state.lang=state.lang==='ru'?'en':'ru'; localStorage.setItem('foody_lang',state.lang); renderOffers(); });
-
   const toastBox = $('#toast'); const toast=(m)=>{ const el=document.createElement('div'); el.className='toast'; el.textContent=m; toastBox.appendChild(el); setTimeout(()=>el.remove(),3200); };
 
-  // ---- API helpers ----
+  // --- API helpers ---
   const jget  = (p)=> fetch(FOODY_API+p,{ headers:{'X-Foody-Key': state.api_key } }).then(r=>r.json());
   const jpost = (p,b)=> fetch(FOODY_API+p,{ method:'POST',headers:{'Content-Type':'application/json','X-Foody-Key': state.api_key}, body: JSON.stringify(b)}).then(r=>{ if(!r.ok) throw new Error(r.statusText); return r.json(); });
   const jput  = (p,b)=> fetch(FOODY_API+p,{ method:'PUT', headers:{'Content-Type':'application/json','X-Foody-Key': state.api_key}, body: JSON.stringify(b)}).then(r=>{ if(!r.ok) throw new Error(r.statusText); return r.json(); });
 
-  // ---- Stats chart ----
+  // --- Статистика ---
   const metricSel = $('#metric'); const chartCanvas = $('#chart'); const ctx = chartCanvas.getContext('2d');
   function drawChart(points){
     ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
-    // simple autoscale
     const W = chartCanvas.clientWidth; const H = chartCanvas.height; chartCanvas.width=W;
     const xs = points.map(p=>new Date(p.x).getTime()); const ys = points.map(p=>p.y);
     const minX = Math.min(...xs, Date.now()-7*864e5), maxX = Math.max(...xs, Date.now());
     const minY = 0, maxY = Math.max(1, ...ys);
     const px = (t)=> (W-32) * ( (t - minX) / (maxX - minX || 1) ) + 16;
     const py = (v)=> H-24 - (H-48) * ( (v - minY) / (maxY - minY || 1) );
-    // grid
-    ctx.strokeStyle = 'rgba(180,200,220,.15)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(16, H-24); ctx.lineTo(W-16, H-24); ctx.stroke();
-    // line
+    ctx.strokeStyle = 'rgba(180,200,220,.15)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(16, H-24); ctx.lineTo(W-16, H-24); ctx.stroke();
     ctx.strokeStyle = '#4ab5f1'; ctx.lineWidth=2; ctx.beginPath();
     points.forEach((p,i)=>{ const x=px(new Date(p.x).getTime()), y=py(p.y); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
     ctx.stroke();
-    // dots
     ctx.fillStyle = '#61d39f';
     points.forEach(p=>{ const x=px(new Date(p.x).getTime()), y=py(p.y); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); });
   }
@@ -64,14 +42,13 @@
   }
   metricSel.addEventListener('change', loadStats);
 
-  // ---- Offers ----
-  const offersBox = $('#offers'); const search = $('#search');
-  let offers = [];
+  // --- Офферы ---
+  const offersBox = $('#offers'); const search = $('#search'); let offers = [];
   function renderOffers(){
     const q = (search.value||'').toLowerCase();
     offersBox.innerHTML = '';
     const list = offers.filter(o => !q || (o.title||'').toLowerCase().includes(q));
-    if(!list.length){ offersBox.innerHTML = '<div class="sub">Нет офферов</div>'; return; }
+    if(!list.length){ offersBox.innerHTML = '<div class="subtitle">Нет офферов</div>'; return; }
     list.forEach(o=>{
       const el = document.createElement('div'); el.className='item';
       el.innerHTML = `
@@ -81,9 +58,9 @@
           <div class="sub">₽ ${(o.price_cents||0)/100} • осталось ${o.qty_left??'—'} / ${o.qty_total??'—'}</div>
         </div>
         <div class="actions">
-          <button class="btn" data-act="edit">`+t('edit')+`</button>
-          <button class="btn" data-act="${o.status==='active'?'archive':'activate'}">${o.status==='active'?t('archive'):t('activate')}</button>
-          <button class="btn" data-act="delete">`+t('del')+`</button>
+          <button class="btn" data-act="edit">Ред.</button>
+          <button class="btn" data-act="${o.status==='active'?'archive':'activate'}">${o.status==='active'?'В архив':'Активировать'}</button>
+          <button class="btn" data-act="delete">Удалить</button>
         </div>
       `;
       el.querySelector('[data-act="edit"]').onclick = ()=> openEdit(o);
@@ -98,17 +75,10 @@
     renderOffers();
   }
   search.addEventListener('input', renderOffers);
+  async function changeStatus(o, action){ await jpost('/api/v1/merchant/offers/status',{ restaurant_id: state.restaurant_id, offer_id:o.id, action }).catch(()=>toast('Ошибка')); await loadOffers(); }
+  async function removeOffer(o){ await jpost('/api/v1/merchant/offers/delete',{ restaurant_id: state.restaurant_id, offer_id:o.id }).catch(()=>toast('Ошибка')); toast('Удалено'); await loadOffers(); }
 
-  async function changeStatus(o, action){
-    await jpost('/api/v1/merchant/offers/status',{ restaurant_id: state.restaurant_id, offer_id:o.id, action }).catch(()=>toast(t('failed')));
-    await loadOffers();
-  }
-  async function removeOffer(o){
-    await jpost('/api/v1/merchant/offers/delete',{ restaurant_id: state.restaurant_id, offer_id:o.id }).catch(()=>toast(t('failed')));
-    toast(t('removed')); await loadOffers();
-  }
-
-  // ---- Create ----
+  // --- Создание ---
   $('#createBtn').addEventListener('click', ()=> $('#offerForm').scrollIntoView({behavior:'smooth'}));
   $('#offerForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -126,11 +96,11 @@
     };
     try{
       await jpost('/api/v1/merchant/offers', payload);
-      toast(t('saved')); f.reset(); $('#preview').style.display='none'; await loadOffers();
-    }catch{ toast(t('failed')); }
+      toast('Сохранено ✅'); f.reset(); $('#preview').style.display='none'; await loadOffers();
+    }catch{ toast('Ошибка'); }
   });
 
-  // ---- Edit modal ----
+  // --- Редактирование ---
   const modal = $('#modal'); $('#modalClose').onclick = ()=> modal.classList.add('hidden');
   function openEdit(o){
     modal.classList.remove('hidden');
@@ -162,29 +132,26 @@
     };
     try{
       await jput(`/api/v1/merchant/offers/${id}`, payload);
-      toast(t('saved')); modal.classList.add('hidden'); await loadOffers();
-    }catch{ toast(t('failed')); }
+      toast('Сохранено ✅'); modal.classList.add('hidden'); await loadOffers();
+    }catch{ toast('Ошибка'); }
   });
 
-  // ---- CSV export ----
+  // --- CSV ---
   $('#exportBtn').addEventListener('click', ()=>{
     const url = `${FOODY_API}/api/v1/merchant/offers/csv?restaurant_id=${state.restaurant_id}`;
     const a = document.createElement('a'); a.href = url; a.target = '_blank';
-    a.download = `offers_${state.restaurant_id}.csv`;
-    a.rel = 'noopener'; a.click();
+    a.download = `offers_${state.restaurant_id}.csv`; a.rel = 'noopener'; a.click();
   });
 
-  // ---- DnD + resize + R2 presign ----
+  // --- Загрузка фото (DnD + resize + presign) ---
   const dz = $('#dropzone'); const fileInput = $('#fileInput'); const preview = $('#preview'); const uploadBtn = $('#uploadBtn');
   let chosenFile = null;
-  const pickFile = ()=> fileInput.click();
-  dz.addEventListener('click', pickFile);
+  dz.addEventListener('click', ()=> fileInput.click());
   ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
   ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
   dz.addEventListener('drop', e => { chosenFile = (e.dataTransfer.files||[])[0]||null; showPreview(); });
   fileInput.addEventListener('change', e => { chosenFile = (e.target.files||[])[0]||null; showPreview(); });
   function showPreview(){ if(!chosenFile){ preview.style.display='none'; preview.src=''; return; } const url = URL.createObjectURL(chosenFile); preview.src=url; preview.style.display='block'; }
-
   async function resizeImage(file, maxSide=1600, quality=0.85){
     if (!file?.type?.startsWith('image/')) return file;
     const img = document.createElement('img');
@@ -206,19 +173,17 @@
     return presign.public_url;
   }
   uploadBtn.addEventListener('click', async ()=>{
-    if(!chosenFile){ return alert('Выбери файл'); }
+    if(!chosenFile){ return alert('Выберите файл'); }
     try{
-      toast(t('uploading'));
+      toast('Загружаем...');
       const resized = await resizeImage(chosenFile, 1600, 0.85);
       const url = await uploadWithPresign(resized);
       document.querySelector('input[name="image_url"]').value = url;
       preview.src = url;
-      toast(t('uploaded'));
+      toast('Фото загружено');
     }catch(e){ console.error(e); toast('Ошибка загрузки'); }
   });
 
-  // ---- Kickoff ----
-  (async function init(){
-    await Promise.all([loadOffers(), loadStats()]);
-  })();
+  // Init
+  (async function init(){ await Promise.all([loadOffers(), loadStats()]); })();
 })();

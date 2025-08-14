@@ -9,25 +9,34 @@
   <script defer src="./app.js"></script>
 </head>
 <body>
-  <header class="hdr">
-    <div class="left">🍽️ Foody</div>
-    <div class="right"><button id="langBtn" class="btn ghost">RU/EN</button></div>
-  </header>
-  <main class="container">
-    <div class="filters">
-      <input id="q" placeholder="Поиск / Search" />
-      <button id="refresh" class="btn">↻</button>
-    </div>
-    <div id="grid" class="grid"></div>
-  </main>
+  <div class="tg-shell">
+    <header class="tg-appbar">
+      <div class="tg-appbar__left">
+        <div class="avatar">F</div>
+        <div class="meta">
+          <div class="title">Foody · Витрина</div>
+          <div class="subtitle">Скидки перед закрытием</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="tg-content">
+      <div class="toolbar">
+        <input id="q" class="search" placeholder="Поиск" />
+        <button id="refresh" class="btn">Обновить</button>
+      </div>
+      <div id="grid" class="grid"></div>
+    </main>
+  </div>
+
   <div id="sheet" class="sheet hidden">
     <div class="sheet__dialog">
-      <div class="sheet__header">
-        <div class="sheet__title" id="sTitle">—</div>
-        <button class="sheet__close" id="sheetClose">×</button>
+      <div class="sheet__h">
+        <div class="sheet__t" id="sTitle">—</div>
+        <button class="sheet__x" id="sheetClose">×</button>
       </div>
-      <div class="sheet__body">
-        <img id="sImg" alt="preview" />
+      <div class="sheet__b">
+        <img id="sImg" alt="" />
         <div class="meta">
           <div id="sPrice" class="price">—</div>
           <div id="sOld" class="old">—</div>
@@ -39,6 +48,7 @@
       </div>
     </div>
   </div>
+
   <div id="toast"></div>
 </body>
 </html>
