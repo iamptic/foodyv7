@@ -17,6 +17,8 @@ R2_ACCESS_KEY_ID     = os.getenv("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
 
 app = FastAPI(title="Foody Backend — MVP API")
+from addons_reserve_timer import mount as mount_reserve_timer
+mount_reserve_timer(app)
 if CORS:
     app.add_middleware(
         CORSMiddleware,
